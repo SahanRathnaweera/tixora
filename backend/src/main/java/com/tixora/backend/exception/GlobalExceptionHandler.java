@@ -20,13 +20,8 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-
-
-    @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<ApiError> tooLarge(MaxUploadSizeExceededException ex, HttpServletRequest req) {
-        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Image is too large (max 5 MB)", req);
-    }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ApiError> notFound(ResourceNotFoundException ex, HttpServletRequest req) {
@@ -46,6 +41,11 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.CONFLICT, msg, req);
     }
 
+    @ExceptionHandler(PaymentDeclinedException.class)
+    public ResponseEntity<ApiError> paymentDeclined(PaymentDeclinedException ex, HttpServletRequest req) {
+        return build(HttpStatus.PAYMENT_REQUIRED, ex.getMessage(), req);
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> integrity(DataIntegrityViolationException ex, HttpServletRequest req) {
         log.warn("Data integrity violation", ex);
@@ -60,6 +60,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiError> forbidden(AccessDeniedException ex, HttpServletRequest req) {
         return build(HttpStatus.FORBIDDEN, "You do not have permission to perform this action", req);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> tooLarge(MaxUploadSizeExceededException ex, HttpServletRequest req) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "Image is too large (max 5 MB)", req);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
