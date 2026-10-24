@@ -1,5 +1,5 @@
 package com.tixora.backend.entity;
 
 public enum BookingStatus {
-    CONFIRMED, CANCELLED
+    PENDING_PAYMENT, CONFIRMED, CANCELLED
 }

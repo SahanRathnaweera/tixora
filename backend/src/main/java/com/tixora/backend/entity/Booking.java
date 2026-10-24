@@ -9,11 +9,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "bookings")
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class Booking {
 
     @Id
@@ -38,11 +34,27 @@ public class Booking {
     @Column(nullable = false, length = 20)
     private BookingStatus bookingStatus;
 
+    // Nullable on purpose: bookings made before checkout existed have no value
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private PaymentStatus paymentStatus;
+
+    /** Seats are held until this moment while the booking waits for payment. */
+    private LocalDateTime expiresAt;
+
+    private LocalDateTime paidAt;
+
+    @Column(length = 40)
+    private String paymentReference;
+
+    /** Only the last 4 digits are kept. Full card details are never stored. */
+    @Column(length = 4)
+    private String cardLast4;
+
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL)
     private Ticket ticket;
-
 }
