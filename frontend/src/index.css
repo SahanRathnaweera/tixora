@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-sans antialiased;
+    background-color: #f7f4ec; /* cream */
+    color: #0b3027;
+    transition: color 0.3s ease;
+  }
+.dark body {
+  background-color: #05140f;
+  background-image: radial-gradient(1100px 560px at 50% -8%, #0f3d32 0%, #08211a 42%, #05140f 100%);
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  color: #f1ede0;
+}
+  ::selection {
+    background: #c9a45c;
+    color: #05140f;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-ink-800/10 bg-white shadow-sm transition-all duration-300
+           dark:border-gold-500/15 dark:bg-ink-800/80 dark:shadow-none;
+  }
+  .btn-gold {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-b
+           from-gold-400 to-gold-500 px-5 py-2.5 text-sm font-semibold text-ink-950
+           transition hover:from-gold-300 hover:to-gold-400 active:scale-[.98]
+           disabled:cursor-not-allowed disabled:opacity-50;
+    box-shadow: 0 8px 20px -10px rgba(201, 164, 92, 0.7);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-ink-800/20
+           px-5 py-2.5 text-sm font-medium transition hover:bg-ink-800/5 active:scale-[.98]
+           disabled:cursor-not-allowed disabled:opacity-50
+           dark:border-gold-500/30 dark:hover:bg-gold-500/10;
+  }
+  .input {
+    @apply w-full rounded-xl border border-ink-800/15 bg-white px-4 py-2.5 text-sm outline-none
+           transition placeholder:text-ink-800/40 focus:border-gold-500 focus:ring-2
+           focus:ring-gold-500/30 dark:border-gold-500/20 dark:bg-ink-900/70
+           dark:placeholder:text-stone-400/50;
+  }
+  .gold-text {
+    @apply bg-gradient-to-r from-gold-600 via-gold-500 to-gold-600 bg-clip-text text-transparent
+           dark:from-gold-300 dark:via-gold-400 dark:to-gold-300;
+  }
+  .muted {
+    @apply text-ink-800/70 dark:text-stone-300/70;
+  }
+
+  @keyframes scan-line {
+  0%,
+  100% {
+    top: 8%;
+  }
+  50% {
+    top: 90%;
+  }
+}
+.scan-line {
+  animation: scan-line 1.8s ease-in-out infinite;
+}
+
+/* Respect users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+}
