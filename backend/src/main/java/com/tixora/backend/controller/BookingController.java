@@ -2,6 +2,7 @@ package com.tixora.backend.controller;
 
 import com.tixora.backend.dto.BookingRequest;
 import com.tixora.backend.dto.BookingResponse;
+import com.tixora.backend.dto.PaymentRequest;
 import com.tixora.backend.security.AppUserDetails;
 import com.tixora.backend.service.BookingService;
 import jakarta.validation.Valid;
@@ -17,6 +18,7 @@ import java.util.List;
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
 public class BookingController {
+
     private final BookingService bookingService;
 
     @PostMapping
@@ -24,6 +26,13 @@ public class BookingController {
                                                   @Valid @RequestBody BookingRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(bookingService.create(principal.getUser().getId(), request));
+    }
+
+    @PostMapping("/{id}/pay")
+    public BookingResponse pay(@AuthenticationPrincipal AppUserDetails principal,
+                               @PathVariable Long id,
+                               @Valid @RequestBody PaymentRequest request) {
+        return bookingService.pay(principal.getUser().getId(), id, request);
     }
 
     @GetMapping("/my")
