@@ -4,6 +4,7 @@ import type {
   Booking,
   EventInput,
   EventItem,
+  PaymentInput,
   User,
   VerifyResult,
 } from '../types';
@@ -82,8 +83,12 @@ export const uploadApi = {
 };
 
 export const bookingApi = {
+  /** Step 1: hold the seats. The ticket is issued only after payment. */
   create: (eventId: number, bookedSeats: number) =>
     api.post<Booking>('/bookings', { eventId, bookedSeats }).then((r) => r.data),
+  /** Step 2: simulated payment. */
+  pay: (id: number, payment: PaymentInput) =>
+    api.post<Booking>(`/bookings/${id}/pay`, payment).then((r) => r.data),
   mine: () => api.get<Booking[]>('/bookings/my').then((r) => r.data),
   cancel: (id: number) => api.post<Booking>(`/bookings/${id}/cancel`).then((r) => r.data),
 };
