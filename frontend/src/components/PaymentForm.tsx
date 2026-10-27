@@ -15,12 +15,6 @@ interface Props {
   onClose: () => void;
 }
 
-const TEST_CARDS = [
-  { label: 'Approved', number: '4242 4242 4242 4242' },
-  { label: 'Declined', number: '4000 0000 0000 0002' },
-  { label: 'No funds', number: '4000 0000 0000 9995' },
-];
-
 const digitsOnly = (v: string) => v.replace(/\D/g, '');
 const formatCard = (v: string) =>
   digitsOnly(v)
@@ -56,14 +50,6 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
     }
   }, [expired, onExpired]);
 
-  const fillTestCard = (number: string) => {
-    setCardNumber(number);
-    if (!cardHolder) setCardHolder('Demo User');
-    if (!expiry) setExpiry('12/30');
-    if (!cvv) setCvv('123');
-    setError(null);
-  };
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (processing || expired) return;
@@ -91,7 +77,7 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
     };
 
     setProcessing(true);
-    // Run the request together with a short "processing" pause so the demo feels real
+    // Run the request together with a short "processing" pause so the checkout feels real
     const [result] = await Promise.all([
       bookingApi
         .pay(booking.id, payload)
@@ -125,7 +111,7 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
 
   return (
     <div className="p-6 sm:p-8">
-           <div className="flex items-start justify-between gap-4 pr-10">
+      <div className="flex items-start justify-between gap-4 pr-10">
         <div className="text-left">
           <h3 className="font-display text-2xl font-semibold">Payment</h3>
           <p className="muted mt-1 text-sm">
@@ -152,25 +138,6 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
         </span>
       </div>
 
-      {/* Demo test cards */}
-      <div className="mt-4 rounded-xl border border-dashed border-gold-500/40 p-3 text-left">
-        <p className="text-xs font-semibold uppercase tracking-wider text-gold-700 dark:text-gold-400">
-          Demo checkout: no real payment
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {TEST_CARDS.map((c) => (
-            <button
-              key={c.number}
-              type="button"
-              onClick={() => fillTestCard(c.number)}
-              className="rounded-full border border-gold-500/40 px-3 py-1 text-xs font-medium transition hover:bg-gold-500/15"
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit} className="mt-4 space-y-3 text-left">
         <input
           className="input"
@@ -183,12 +150,17 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
         />
 
         <div className="relative">
-          <CreditCard size={16} className="absolute left-3.5 top-3.5 text-ink-800/40 dark:text-stone-400/60" />
+          <CreditCard
+            size={16}
+            className="absolute left-3.5 top-3.5 text-ink-800/40 dark:text-stone-400/60"
+          />
           <input
             className="input !pl-10 font-mono"
             placeholder="Card number"
             value={cardNumber}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setCardNumber(formatCard(e.target.value))}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setCardNumber(formatCard(e.target.value))
+            }
             required
             inputMode="numeric"
             autoComplete="off"
@@ -200,7 +172,9 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
             className="input font-mono"
             placeholder="MM/YY"
             value={expiry}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setExpiry(formatExpiry(e.target.value))}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setExpiry(formatExpiry(e.target.value))
+            }
             required
             inputMode="numeric"
             autoComplete="off"
@@ -210,7 +184,9 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
             placeholder="CVV"
             type="password"
             value={cvv}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setCvv(digitsOnly(e.target.value).slice(0, 4))}
+            onChange={(e: ChangeEvent<HTMLInputElement>) =>
+              setCvv(digitsOnly(e.target.value).slice(0, 4))
+            }
             required
             inputMode="numeric"
             autoComplete="off"
@@ -227,11 +203,6 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
           <Lock size={16} />
           {processing ? 'Processing payment...' : `Pay ${formatPrice(booking.totalPrice)}`}
         </button>
-
-        <p className="muted flex items-center justify-center gap-1.5 text-center text-xs">
-          <ShieldCheck size={13} />
-          Simulated payment. Card details are never stored.
-        </p>
       </form>
     </div>
   );
