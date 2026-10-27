@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CalendarDays, Download, MapPin, Maximize2, XCircle } from 'lucide-react';
+import { CalendarDays, Clock, Download, Lock, MapPin, Maximize2, XCircle } from 'lucide-react';
+import { useCountdown } from '../hooks/useCountdown';
 import { getErrorMessage } from '../lib/api';
 import { formatDate, formatDateTime, formatPrice, formatTime } from '../lib/format';
 import type { Booking } from '../types';
@@ -9,32 +10,42 @@ interface Props {
   now: number;
   onCancel: (id: number) => Promise<void>;
   onZoom: (booking: Booking) => void;
+  onPay: (booking: Booking) => void;
 }
 
-type Status = 'valid' | 'used' | 'expired' | 'cancelled';
-
-function getStatus(b: Booking, now: number): Status {
-  if (b.bookingStatus === 'CANCELLED') return 'cancelled';
-  if (b.ticket?.verified) return 'used';
-  if (new Date(b.eventDate).getTime() < now) return 'expired';
-  return 'valid';
-}
+type Status = 'pending' | 'lapsed' | 'valid' | 'used' | 'expired' | 'cancelled';
 
 const BADGE: Record<Status, { label: string; className: string }> = {
+  pending: { label: 'Awaiting payment', className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
+  lapsed: { label: 'Hold expired', className: 'bg-slate-500/15 text-slate-600 dark:text-slate-300' },
   valid: { label: 'Valid', className: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' },
   used: { label: 'Used', className: 'bg-slate-500/15 text-slate-600 dark:text-slate-300' },
   expired: { label: 'Expired', className: 'bg-amber-500/15 text-amber-700 dark:text-amber-400' },
   cancelled: { label: 'Cancelled', className: 'bg-red-500/15 text-red-600 dark:text-red-400' },
 };
 
-export default function TicketCard({ booking, now, onCancel, onZoom }: Props) {
+const mmss = (s: number) =>
+  `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+function getStatus(b: Booking, now: number, left: number | null): Status {
+  if (b.bookingStatus === 'CANCELLED') return 'cancelled';
+  if (b.bookingStatus === 'PENDING_PAYMENT') return left === 0 ? 'lapsed' : 'pending';
+  if (b.ticket?.verified) return 'used';
+  if (new Date(b.eventDate).getTime() < now) return 'expired';
+  return 'valid';
+}
+
+export default function TicketCard({ booking, now, onCancel, onZoom, onPay }: Props) {
+  const left = useCountdown(booking.bookingStatus === 'PENDING_PAYMENT' ? booking.holdSecondsLeft : null);
+
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const status = getStatus(booking, now);
+  const status = getStatus(booking, now, left);
   const badge = BADGE[status];
   const ticket = booking.ticket;
+  const canCancel = status === 'valid' || status === 'pending';
 
   const handleCancel = async () => {
     setBusy(true);
@@ -48,6 +59,20 @@ export default function TicketCard({ booking, now, onCancel, onZoom }: Props) {
       setBusy(false);
     }
   };
+
+  // Short payment note under the figures
+  let paymentNote: string | null = null;
+  if (status === 'pending' && left !== null) {
+    paymentNote = `Pay within ${mmss(left)} to keep your seats.`;
+  } else if (status === 'lapsed') {
+    paymentNote = 'The payment window closed and your seats were released.';
+  } else if (booking.bookingStatus === 'CONFIRMED') {
+    paymentNote = `Paid${booking.cardLast4 ? ` with card •••• ${booking.cardLast4}` : ''}${
+      booking.paymentReference ? ` · ${booking.paymentReference}` : ''
+    }`;
+  } else if (booking.paymentStatus === 'REFUNDED') {
+    paymentNote = 'Refunded (simulated).';
+  }
 
   return (
     <article className="card overflow-hidden hover:border-gold-500/40 md:flex">
@@ -94,33 +119,60 @@ export default function TicketCard({ booking, now, onCancel, onZoom }: Props) {
           </div>
         </dl>
 
-        {/* Cancel flow */}
-        {status === 'valid' &&
-          (confirming ? (
-            <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
-              <p className="flex-1 text-sm text-red-700 dark:text-red-300">
-                Cancel this booking? Your seats will be released.
-              </p>
-              <button
-                onClick={() => setConfirming(false)}
-                disabled={busy}
-                className="btn-ghost !px-4 !py-1.5"
-              >
-                Keep
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={busy}
-                className="inline-flex items-center rounded-xl bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
-              >
-                {busy ? 'Cancelling...' : 'Yes, cancel'}
-              </button>
-            </div>
-          ) : (
-            <button onClick={() => setConfirming(true)} className="btn-ghost mt-5 !py-2">
-              <XCircle size={16} /> Cancel booking
+        {paymentNote && (
+          <p
+            className={`mt-4 flex items-center gap-2 text-sm ${
+              status === 'pending'
+                ? 'font-medium text-amber-700 dark:text-amber-400'
+                : 'muted'
+            }`}
+          >
+            {status === 'pending' && <Clock size={15} className="shrink-0" />}
+            {paymentNote}
+          </p>
+        )}
+
+        {/* Actions */}
+        {status === 'pending' && !confirming && (
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button onClick={() => onPay(booking)} className="btn-gold !py-2">
+              <Lock size={15} /> Pay now
             </button>
-          ))}
+            <button onClick={() => setConfirming(true)} className="btn-ghost !py-2">
+              <XCircle size={16} /> Release seats
+            </button>
+          </div>
+        )}
+
+        {status === 'valid' && !confirming && (
+          <button onClick={() => setConfirming(true)} className="btn-ghost mt-5 !py-2">
+            <XCircle size={16} /> Cancel booking
+          </button>
+        )}
+
+        {canCancel && confirming && (
+          <div className="mt-5 flex flex-wrap items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3">
+            <p className="flex-1 text-sm text-red-700 dark:text-red-300">
+              {status === 'pending'
+                ? 'Release these seats? You will not be charged.'
+                : 'Cancel this booking? Your seats are released and the payment is refunded (simulated).'}
+            </p>
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+              className="btn-ghost !px-4 !py-1.5"
+            >
+              Keep
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={busy}
+              className="inline-flex items-center rounded-xl bg-red-600 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+            >
+              {busy ? 'Working...' : status === 'pending' ? 'Yes, release' : 'Yes, cancel'}
+            </button>
+          </div>
+        )}
 
         {error && (
           <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm text-red-600 dark:text-red-400">
@@ -172,6 +224,11 @@ export default function TicketCard({ booking, now, onCancel, onZoom }: Props) {
               </a>
             )}
           </>
+        ) : status === 'pending' || status === 'lapsed' ? (
+          <div className="muted text-center text-sm">
+            <Lock size={28} className="mx-auto mb-2 text-gold-500" />
+            Your QR ticket is issued after payment.
+          </div>
         ) : (
           <p className="muted text-sm">No ticket available</p>
         )}

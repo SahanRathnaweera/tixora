@@ -125,7 +125,7 @@ export default function PaymentForm({ booking, secondsLeft, onPaid, onExpired, o
 
   return (
     <div className="p-6 sm:p-8">
-      <div className="flex items-start justify-between gap-4">
+           <div className="flex items-start justify-between gap-4 pr-10">
         <div className="text-left">
           <h3 className="font-display text-2xl font-semibold">Payment</h3>
           <p className="muted mt-1 text-sm">

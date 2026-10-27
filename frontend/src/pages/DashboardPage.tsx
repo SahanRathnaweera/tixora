@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw, TicketX, X } from 'lucide-react';
+import PaymentModal from '../components/PaymentModal';
+import Portal from '../components/Portal';
 import TicketCard from '../components/TicketCard';
 import { useAuth } from '../context/AuthContext';
 import { bookingApi, getErrorMessage } from '../lib/api';
@@ -37,38 +39,40 @@ function QrLightbox({ booking, onClose }: { booking: Booking; onClose: () => voi
   if (!booking.ticket) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
+    <Portal>
       <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm animate-fade-up rounded-3xl border border-gold-500/30 bg-cream-50 p-6 text-center shadow-2xl dark:bg-ink-800"
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
+        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
       >
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-ink-800/10 transition hover:bg-ink-800/20 dark:bg-white/10"
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="relative w-full max-w-sm animate-fade-up rounded-3xl border border-gold-500/30 bg-cream-50 p-6 text-center shadow-2xl dark:bg-ink-800"
         >
-          <X size={16} />
-        </button>
-        <h3 className="font-display text-xl font-semibold">{booking.eventTitle}</h3>
-        <p className="muted mt-1 text-xs">
-          {booking.bookedSeats} seat{booking.bookedSeats > 1 ? 's' : ''} · Booking #{booking.id}
-        </p>
-        <img
-          src={booking.ticket.qrCodeImage}
-          alt="Ticket QR code"
-          className="mx-auto mt-5 h-64 w-64 rounded-2xl bg-white p-3 shadow-md"
-        />
-        <p className="mt-4 break-all font-mono text-[11px] text-ink-800/70 dark:text-stone-300/70">
-          {booking.ticket.qrCodeData}
-        </p>
-        <p className="muted mt-2 text-xs">Show this code at the entrance.</p>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-ink-800/10 transition hover:bg-ink-800/20 dark:bg-white/10"
+          >
+            <X size={16} />
+          </button>
+          <h3 className="font-display text-xl font-semibold">{booking.eventTitle}</h3>
+          <p className="muted mt-1 text-xs">
+            {booking.bookedSeats} seat{booking.bookedSeats > 1 ? 's' : ''} · Booking #{booking.id}
+          </p>
+          <img
+            src={booking.ticket.qrCodeImage}
+            alt="Ticket QR code"
+            className="mx-auto mt-5 h-64 w-64 rounded-2xl bg-white p-3 shadow-md"
+          />
+          <p className="mt-4 break-all font-mono text-[11px] text-ink-800/70 dark:text-stone-300/70">
+            {booking.ticket.qrCodeData}
+          </p>
+          <p className="muted mt-2 text-xs">Show this code at the entrance.</p>
+        </div>
       </div>
-    </div>
+    </Portal>
   );
 }
 
@@ -80,13 +84,19 @@ export default function DashboardPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const [tab, setTab] = useState<Tab>('upcoming');
   const [zoom, setZoom] = useState<Booking | null>(null);
+  const [payFor, setPayFor] = useState<{ booking: Booking; secondsLeft: number } | null>(null);
   const [now] = useState(() => Date.now());
+  const [loadedAt, setLoadedAt] = useState(() => Date.now());
 
   useEffect(() => {
     let active = true;
     bookingApi
       .mine()
-      .then((data) => active && setBookings(data))
+      .then((data) => {
+        if (!active) return;
+        setBookings(data);
+        setLoadedAt(Date.now());
+      })
       .catch((err) => active && setError(getErrorMessage(err)))
       .finally(() => active && setLoading(false));
     return () => {
@@ -100,12 +110,24 @@ export default function DashboardPage() {
     setReloadKey((k) => k + 1);
   };
 
+  // Quiet refresh (no loading skeleton), used after the payment window closes
+  const refresh = useCallback(() => {
+    bookingApi
+      .mine()
+      .then((data) => {
+        setBookings(data);
+        setLoadedAt(Date.now());
+      })
+      .catch(() => undefined);
+  }, []);
+
   const groups = useMemo(() => {
     const upcoming: Booking[] = [];
     const past: Booking[] = [];
     const cancelled: Booking[] = [];
     for (const b of bookings) {
       if (b.bookingStatus === 'CANCELLED') cancelled.push(b);
+      else if (b.bookingStatus === 'PENDING_PAYMENT') upcoming.push(b); // waiting for payment
       else if (b.ticket?.verified || new Date(b.eventDate).getTime() < now) past.push(b);
       else upcoming.push(b);
     }
@@ -117,11 +139,22 @@ export default function DashboardPage() {
     setBookings((prev) => prev.map((b) => (b.id === id ? updated : b)));
   };
 
+  const handlePay = (b: Booking) => {
+    const elapsed = Math.floor((Date.now() - loadedAt) / 1000);
+    setPayFor({ booking: b, secondsLeft: Math.max(0, (b.holdSecondsLeft ?? 0) - elapsed) });
+  };
+
+  const handlePaid = (paid: Booking) => {
+    setBookings((prev) => prev.map((b) => (b.id === paid.id ? paid : b)));
+    setPayFor(null);
+    setTab('upcoming');
+    if (paid.ticket) setZoom(paid); // show the freshly issued QR code
+  };
+
   const list = groups[tab];
 
   return (
     <div className="animate-fade-up">
-      {/* Header */}
       <div className="mb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-gold-600 dark:text-gold-400">
           {user ? `Welcome, ${user.name.split(' ')[0]}` : 'My account'}
@@ -130,7 +163,6 @@ export default function DashboardPage() {
         <div className="mt-3 h-0.5 w-16 rounded-full bg-gradient-to-r from-gold-500 to-transparent" />
       </div>
 
-      {/* Tabs */}
       <div className="mb-6 inline-flex gap-1 rounded-xl border border-ink-800/10 bg-white p-1 dark:border-gold-500/15 dark:bg-ink-900/60">
         {TABS.map((t) => (
           <button
@@ -148,7 +180,6 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* Content */}
       {loading ? (
         <div className="space-y-5">
           {Array.from({ length: 2 }).map((_, i) => (
@@ -180,10 +211,28 @@ export default function DashboardPage() {
               className="animate-fade-up"
               style={{ animationDelay: `${Math.min(i, 6) * 70}ms` }}
             >
-              <TicketCard booking={b} now={now} onCancel={handleCancel} onZoom={setZoom} />
+              <TicketCard
+                booking={b}
+                now={now}
+                onCancel={handleCancel}
+                onZoom={setZoom}
+                onPay={handlePay}
+              />
             </div>
           ))}
         </div>
+      )}
+
+      {payFor && (
+        <PaymentModal
+          booking={payFor.booking}
+          secondsLeft={payFor.secondsLeft}
+          onPaid={handlePaid}
+          onClose={() => {
+            setPayFor(null);
+            refresh();
+          }}
+        />
       )}
 
       {zoom && <QrLightbox booking={zoom} onClose={() => setZoom(null)} />}
